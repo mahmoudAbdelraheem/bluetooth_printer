@@ -1,0 +1,103 @@
+package com.example.bluetooth_printer_example
+
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothSocket
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
+import android.widget.Toast
+import androidx.annotation.RequiresApi
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.plugin.common.MethodChannel
+import java.io.IOException
+import java.util.*
+
+class MainActivity : FlutterActivity() {
+    private val CHANNEL = "bluetooth_printer"
+    private var bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+    private var connectedPrinterDevice: BluetoothDevice? = null // تعريف المتغير
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // تأكد من وجود البلوتوث
+        if (bluetoothAdapter == null) {
+            Toast.makeText(this, "Bluetooth is not supported on this device", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // طلب تصريح البلوتوث (للإصدارات الحديثة)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    android.Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(android.Manifest.permission.BLUETOOTH_CONNECT),
+                    1
+                )
+            }
+        }
+
+        // إنشاء قناة للتواصل مع Flutter
+        MethodChannel(flutterEngine!!.dartExecutor, CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "scanDevices" -> {
+                    val devices = scanDevices()
+                    result.success(devices)
+                }
+
+                "connectToPrinter" -> {
+                    val printerAddress = call.argument<String>("printerAddress")
+                    if (printerAddress != null) {
+                        val connectionResult = connectToPrinter(printerAddress)
+                        if (connectionResult) {
+                            result.success("Connected to printer")
+                        } else {
+                            result.error("CONNECTION_FAILED", "Failed to connect to the printer", null)
+                        }
+                    } else {
+                        result.error("INVALID_ARGUMENT", "No printer address provided", null)
+                    }
+                }
+
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    // مسح الأجهزة المقرونة بالبلوتوث
+    private fun scanDevices(): List<String> {
+        val devicesList = mutableListOf<String>()
+        val pairedDevices: Set<BluetoothDevice>? = bluetoothAdapter?.bondedDevices
+        pairedDevices?.forEach { device ->
+            devicesList.add("${device.name}\n${device.address}")
+        }
+        return devicesList
+    }
+
+    private fun connectToPrinter(printerAddress: String): Boolean {
+        return try {
+            val device: BluetoothDevice? = bluetoothAdapter?.getRemoteDevice(printerAddress)
+            val uuid: UUID = device?.uuids?.getOrNull(0)?.uuid ?: UUID.randomUUID()
+            val socket: BluetoothSocket = device?.createRfcommSocketToServiceRecord(uuid)!!
+
+            bluetoothAdapter?.cancelDiscovery()  // إلغاء البحث عن الأجهزة قبل الاتصال
+
+            // محاولة الاتصال بالجهاز
+            socket.connect()
+
+            // حفظ الجهاز المتصل
+            connectedPrinterDevice = device
+            true
+        } catch (e: IOException) {
+            e.printStackTrace()
+            false
+        }
+    }
+}
