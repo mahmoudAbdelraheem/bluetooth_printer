@@ -25,7 +25,7 @@ This repository provides a working example of how to:
 ## Installation
 1. Clone this repository:
    ```bash
-   git clone https://github.com/your-username/bluetooth_printer_example.git
+   git clone git@github.com:mahmoudAbdelraheem/bluetooth_printer.git
    ```
 
 2. Navigate to the project directory:
