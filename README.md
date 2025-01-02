@@ -30,7 +30,7 @@ This repository provides a working example of how to:
 
 2. Navigate to the project directory:
    ```bash
-   cd bluetooth_printer_example
+   cd bluetooth_printer
    ```
 
 3. Install the Flutter dependencies:
